@@ -1022,10 +1022,10 @@ const GomokuTetris = () => {
                 <div className="text-[9px] text-gray-400 font-semibold">下一个</div>
                 {renderNextPiecePreview('sm')}
               </div>
-              {/* 等级 */}
+              {/* 最高分 */}
               <div className="flex-1 text-center">
-                <div className="text-[9px] text-gray-400 font-semibold">等级</div>
-                <div className="text-base font-black text-emerald-600">Lv.{level}</div>
+                <div className="text-[9px] text-gray-400 font-semibold">最高</div>
+                <div className="text-base font-black text-amber-500">{highScore}</div>
               </div>
             </div>
             {/* 移动端色魂能量条 */}
@@ -1115,9 +1115,28 @@ const GomokuTetris = () => {
             </div>
           </div>
 
-          {/* 移动端提示 */}
-          <div className="lg:hidden text-center text-xs text-gray-400 mt-2 px-4">
-            点左/右移动 · 点方块旋转 · 长按加速
+          {/* 移动端底部按钮 */}
+          <div className="lg:hidden flex gap-2 w-full max-w-sm mt-1">
+            <button
+              onClick={resetGame}
+              className="flex-1 py-2.5 bg-gray-600 rounded-lg text-white font-bold text-sm shadow active:bg-gray-700 active:scale-95 transition-transform select-none touch-manipulation"
+            >
+              重开一局
+            </button>
+            <button
+              onTouchStart={(e) => { e.preventDefault(); setIsSoftDropping(true); }}
+              onTouchEnd={(e) => { e.preventDefault(); setIsSoftDropping(false); }}
+              onMouseDown={() => setIsSoftDropping(true)}
+              onMouseUp={() => setIsSoftDropping(false)}
+              onMouseLeave={() => setIsSoftDropping(false)}
+              className={`flex-1 py-2.5 rounded-lg text-white font-bold text-sm shadow active:scale-95 transition-all select-none touch-manipulation ${isSoftDropping ? 'bg-amber-600' : 'bg-amber-500'}`}
+            >
+              {isSoftDropping ? '加速中...' : '加速下坠'}
+            </button>
+          </div>
+          {/* 移动端操作提示 */}
+          <div className="lg:hidden text-center text-[10px] text-gray-400 mt-1.5">
+            点左/右移动 · 点方块旋转
           </div>
         </div>
 
