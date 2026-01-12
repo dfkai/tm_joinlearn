@@ -89,3 +89,18 @@ export interface GomokuCheckResult {
   eliminating: Set<string>;
   matchedColors: ColorId[];
 }
+
+// 关卡系统
+export type GameMode = 'score' | 'level';
+
+export interface LevelTarget {
+  red?: number;
+  blue?: number;
+  yellow?: number;
+}
+
+export interface LevelProgress {
+  red: number;
+  blue: number;
+  yellow: number;
+}

@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles, Smartphone } from 'lucide-react';
 
 // 类型和常量
-import type { Cell, Piece, ColorId, GhostPosition, Combo, GameState, Particle } from './types';
-import { BOARD_SIZE, CELL_SIZE, GAME_CONFIG, KEY_BINDINGS } from './constants';
+import type { Cell, Piece, ColorId, GhostPosition, Combo, GameState, Particle, GameMode, LevelProgress } from './types';
+import { BOARD_SIZE, CELL_SIZE, GAME_CONFIG, KEY_BINDINGS, LEVELS } from './constants';
 
 // 逻辑模块
 import {
@@ -59,6 +59,20 @@ const GomokuTetris = () => {
   const [lastGomokuColor, setLastGomokuColor] = useState<ColorId | null>(null);  // 最后一次五子连珠颜色
   const [activeSoulBomb, setActiveSoulBomb] = useState<ColorId | null>(null);
 
+  // ============ 教程系统 ============
+  const [tutorialShown, setTutorialShown] = useState(() => ({
+    cluster: localStorage.getItem('tutorial_cluster') === 'true',
+    soulBomb: localStorage.getItem('tutorial_soulbomb') === 'true'
+  }));
+  const [showTutorial, setShowTutorial] = useState<'cluster' | 'soulbomb' | null>(null);
+  const tutorialResolveRef = useRef<(() => void) | null>(null);
+
+  // ============ 关卡系统 ============
+  const [gameMode, setGameMode] = useState<GameMode>('score');
+  const [currentLevel, setCurrentLevel] = useState(1);
+  const [levelProgress, setLevelProgress] = useState<LevelProgress>({ red: 0, blue: 0, yellow: 0 });
+  const [showLevelComplete, setShowLevelComplete] = useState(false);
+
   // ============ Refs ============
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrame = useRef(0);
@@ -66,13 +80,40 @@ const GomokuTetris = () => {
   const lockTimerRef = useRef<number | null>(null);
 
   // ============ 游戏初始化 ============
-  const startGame = useCallback(() => {
+  const startGame = useCallback((mode: GameMode = gameMode) => {
     const emptyBoard = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
     setBoard(emptyBoard);
     setScore(0);
     setLevel(1);
     setLinesCleared(0);
     setDropInterval(GAME_CONFIG.initialDropInterval);
+    setSoulCounter(0);
+    setLastGomokuColor(null);
+    setGameMode(mode);
+    setCurrentLevel(1);
+    setLevelProgress({ red: 0, blue: 0, yellow: 0 });
+    setShowLevelComplete(false);
+
+    const first = spawnPiece(emptyBoard);
+    const second = spawnPiece(emptyBoard);
+    setCurrentPiece(first);
+    setNextPiece(second);
+    setGameState('playing');
+  }, [gameMode]);
+
+  const resetGame = useCallback(() => {
+    if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
+    if (dropTimerRef.current) clearInterval(dropTimerRef.current);
+    startGame(gameMode);
+  }, [startGame, gameMode]);
+
+  // 进入下一关
+  const nextLevel = useCallback(() => {
+    const emptyBoard = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+    setBoard(emptyBoard);
+    setLevelProgress({ red: 0, blue: 0, yellow: 0 });
+    setShowLevelComplete(false);
+    setCurrentLevel(prev => prev + 1);
     setSoulCounter(0);
     setLastGomokuColor(null);
 
@@ -83,12 +124,6 @@ const GomokuTetris = () => {
     setGameState('playing');
   }, []);
 
-  const resetGame = useCallback(() => {
-    if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
-    if (dropTimerRef.current) clearInterval(dropTimerRef.current);
-    startGame();
-  }, [startGame]);
-
   // ============ 更新最高分 ============
   useEffect(() => {
     if (score > highScore) {
@@ -96,6 +131,24 @@ const GomokuTetris = () => {
       localStorage.setItem('gomoku_high_score', score.toString());
     }
   }, [score, highScore]);
+
+  // ============ 关卡完成检查 ============
+  useEffect(() => {
+    if (gameMode !== 'level' || gameState !== 'playing' || showLevelComplete) return;
+
+    const target = LEVELS[currentLevel - 1];
+    if (!target) return; // 已通关所有关卡
+
+    const isComplete =
+      (target.red === undefined || levelProgress.red >= target.red) &&
+      (target.blue === undefined || levelProgress.blue >= target.blue) &&
+      (target.yellow === undefined || levelProgress.yellow >= target.yellow);
+
+    if (isComplete) {
+      setShowLevelComplete(true);
+      setGameState('paused');
+    }
+  }, [gameMode, gameState, currentLevel, levelProgress, showLevelComplete]);
 
   // ============ 难度递增 ============
   useEffect(() => {
@@ -186,6 +239,29 @@ const GomokuTetris = () => {
       } else {
         setGameState('gameover');
       }
+    }
+  };
+
+  // ============ 教程弹窗显示 ============
+  const showTutorialAndWait = (type: 'cluster' | 'soulbomb'): Promise<void> => {
+    return new Promise(resolve => {
+      tutorialResolveRef.current = resolve;
+      setShowTutorial(type);
+    });
+  };
+
+  const dismissTutorial = () => {
+    if (showTutorial === 'cluster') {
+      localStorage.setItem('tutorial_cluster', 'true');
+      setTutorialShown(prev => ({ ...prev, cluster: true }));
+    } else if (showTutorial === 'soulbomb') {
+      localStorage.setItem('tutorial_soulbomb', 'true');
+      setTutorialShown(prev => ({ ...prev, soulBomb: true }));
+    }
+    setShowTutorial(null);
+    if (tutorialResolveRef.current) {
+      tutorialResolveRef.current();
+      tutorialResolveRef.current = null;
     }
   };
 
@@ -315,6 +391,11 @@ const GomokuTetris = () => {
       ];
 
       if (allEliminating.size > 0) {
+        // 首次区域消除教程
+        if (clusterResult.cleared && !tutorialShown.cluster) {
+          await showTutorialAndWait('cluster');
+        }
+
         // 处理色魂累积（五子连珠或区域消除都触发）
         if (allMatchedColors.length > 0) {
           currentLastColor = allMatchedColors[allMatchedColors.length - 1];
@@ -325,6 +406,21 @@ const GomokuTetris = () => {
 
         totalScore += lineResult.count * 10 + gomokuResult.count * 30 + clusterResult.count * 25;
         totalLines += lineResult.count;
+
+        // 关卡模式：统计消除的各颜色数量
+        if (gameMode === 'level') {
+          const colorCounts: LevelProgress = { red: 0, blue: 0, yellow: 0 };
+          allEliminating.forEach(key => {
+            const [y, x] = key.split(',').map(Number);
+            const cell = currentBoard[y][x];
+            if (cell) colorCounts[cell.color]++;
+          });
+          setLevelProgress(prev => ({
+            red: prev.red + colorCounts.red,
+            blue: prev.blue + colorCounts.blue,
+            yellow: prev.yellow + colorCounts.yellow
+          }));
+        }
 
         // ===== 阶段1: 高亮闪烁 =====
         setMatchingCells(allEliminating);
@@ -382,6 +478,10 @@ const GomokuTetris = () => {
 
         // 检查是否触发色魂炸弹（达到3次）
         if (currentSoulCount >= 3 && currentLastColor) {
+          // 首次色魂炸弹教程
+          if (!tutorialShown.soulBomb) {
+            await showTutorialAndWait('soulbomb');
+          }
           currentBoard = await executeSoulBomb(currentLastColor, currentBoard);
           currentSoulCount = 0;
           currentLastColor = null;
@@ -846,21 +946,24 @@ const GomokuTetris = () => {
     const touchX = (touch.clientX - rect.left) * scaleX;
     const touchY = (touch.clientY - rect.top) * scaleY;
 
+    // 判断左右侧
+    const isLeftSide = touchX < canvas.width / 2;
     touchStartRef.current = { x: touchX, y: touchY, time: Date.now() };
 
-    // 长按检测 - 开始加速下落
+    // 长按检测 - 连续横向移动
     longPressTimerRef.current = window.setTimeout(() => {
       acceleratingRef.current = true;
-      let speed = 150; // 初始速度
+      let speed = 120; // 初始速度
+      const moveDirection = isLeftSide ? 'left' : 'right';
 
-      const accelerate = () => {
+      const continuousMove = () => {
         if (!acceleratingRef.current) return;
-        setIsSoftDropping(true);
+        handleTouchAction(moveDirection);
         // 逐渐加速
-        speed = Math.max(30, speed - 10);
-        accelIntervalRef.current = window.setTimeout(accelerate, speed);
+        speed = Math.max(50, speed - 5);
+        accelIntervalRef.current = window.setTimeout(continuousMove, speed);
       };
-      accelerate();
+      continuousMove();
     }, 200);
   };
 
@@ -873,10 +976,9 @@ const GomokuTetris = () => {
       longPressTimerRef.current = null;
     }
 
-    // 停止加速下落
+    // 停止连续移动
     if (acceleratingRef.current) {
       acceleratingRef.current = false;
-      setIsSoftDropping(false);
       if (accelIntervalRef.current) {
         clearTimeout(accelIntervalRef.current);
         accelIntervalRef.current = null;
@@ -1033,9 +1135,11 @@ const GomokuTetris = () => {
           {/* 移动端顶部信息栏 - 紧凑版 */}
           <div className="lg:hidden w-full max-w-sm mb-1.5">
             <div className="flex items-center justify-between gap-1 bg-white p-1.5 rounded-lg shadow-sm border border-gray-100">
-              {/* 得分 */}
+              {/* 得分/关卡 */}
               <div className="flex-1 text-center">
-                <div className="text-[9px] text-gray-400 font-semibold">得分</div>
+                <div className="text-[9px] text-gray-400 font-semibold">
+                  {gameMode === 'level' ? `第${currentLevel}关` : '得分'}
+                </div>
                 <div className="text-base font-black text-indigo-600">{score}</div>
               </div>
               {/* 下一个方块 */}
@@ -1049,6 +1153,40 @@ const GomokuTetris = () => {
                 <div className="text-base font-black text-amber-500">{highScore}</div>
               </div>
             </div>
+            {/* 关卡模式进度条 */}
+            {gameMode === 'level' && LEVELS[currentLevel - 1] && (
+              <div className="mt-1 bg-white p-1.5 rounded-lg shadow-sm border border-gray-100">
+                <div className="flex items-center gap-2 text-[9px]">
+                  <span className="text-gray-400 font-semibold whitespace-nowrap">任务:</span>
+                  <div className="flex-1 flex gap-1.5">
+                    {LEVELS[currentLevel - 1].yellow !== undefined && (
+                      <div className="flex items-center gap-0.5">
+                        <div className="w-2.5 h-2.5 rounded-sm bg-[#FFD700]" />
+                        <span className={levelProgress.yellow >= (LEVELS[currentLevel - 1].yellow || 0) ? 'text-emerald-500 font-bold' : 'text-gray-500'}>
+                          {levelProgress.yellow}/{LEVELS[currentLevel - 1].yellow}
+                        </span>
+                      </div>
+                    )}
+                    {LEVELS[currentLevel - 1].red !== undefined && (
+                      <div className="flex items-center gap-0.5">
+                        <div className="w-2.5 h-2.5 rounded-sm bg-[#FF3B3F]" />
+                        <span className={levelProgress.red >= (LEVELS[currentLevel - 1].red || 0) ? 'text-emerald-500 font-bold' : 'text-gray-500'}>
+                          {levelProgress.red}/{LEVELS[currentLevel - 1].red}
+                        </span>
+                      </div>
+                    )}
+                    {LEVELS[currentLevel - 1].blue !== undefined && (
+                      <div className="flex items-center gap-0.5">
+                        <div className="w-2.5 h-2.5 rounded-sm bg-[#4A90E2]" />
+                        <span className={levelProgress.blue >= (LEVELS[currentLevel - 1].blue || 0) ? 'text-emerald-500 font-bold' : 'text-gray-500'}>
+                          {levelProgress.blue}/{LEVELS[currentLevel - 1].blue}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             {/* 移动端色魂能量条 */}
             <div className="mt-1">
               {renderSoulBar(true)}
@@ -1105,7 +1243,7 @@ const GomokuTetris = () => {
               )}
 
               {/* 暂停覆盖 */}
-              {gameState === 'paused' && (
+              {gameState === 'paused' && !showLevelComplete && (
                 <div className="absolute inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center rounded-lg z-10">
                   <div className="text-center p-8 bg-white rounded-2xl shadow-2xl">
                     <h2 className="text-3xl font-black mb-4 text-gray-800">暂停</h2>
@@ -1120,17 +1258,92 @@ const GomokuTetris = () => {
                 </div>
               )}
 
+              {/* 关卡完成弹窗 */}
+              {showLevelComplete && (
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center rounded-lg z-20">
+                  <div className="bg-white rounded-2xl p-6 max-w-xs text-center shadow-2xl mx-4">
+                    <div className="text-5xl mb-3">🎉</div>
+                    <h3 className="text-2xl font-black text-gray-800 mb-2">第 {currentLevel} 关完成!</h3>
+                    <p className="text-gray-500 text-sm mb-4">得分: <span className="font-bold text-indigo-600">{score}</span></p>
+                    {currentLevel < LEVELS.length ? (
+                      <button
+                        onClick={nextLevel}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-full font-bold shadow-lg active:scale-95 transition-all w-full"
+                      >
+                        进入第 {currentLevel + 1} 关
+                      </button>
+                    ) : (
+                      <div>
+                        <p className="text-amber-500 font-bold mb-4">恭喜通关全部关卡!</p>
+                        <button
+                          onClick={() => startGame('level')}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-full font-bold shadow-lg active:scale-95 transition-all w-full"
+                        >
+                          重新挑战
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* 开始界面 */}
               {gameState === 'idle' && (
-                <div
-                  className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer group"
-                  onClick={startGame}
-                >
-                  <div className="bg-white/90 backdrop-blur px-6 py-3 rounded-full shadow-xl border border-indigo-100 transform group-hover:scale-110 transition-all duration-300">
-                    <p className="text-indigo-600 font-black text-xl flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 animate-pulse" />
-                      点击开始游戏
-                    </p>
+                <div className="absolute inset-0 flex items-center justify-center z-10">
+                  <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-6 max-w-xs mx-4">
+                    <h2 className="text-xl font-black text-gray-800 text-center mb-4">选择模式</h2>
+                    <div className="space-y-3">
+                      <button
+                        onClick={() => startGame('score')}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg active:scale-95 transition-all"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <Sparkles className="w-5 h-5" />
+                          计分模式
+                        </div>
+                        <p className="text-xs text-indigo-200 mt-1">经典玩法，挑战最高分</p>
+                      </button>
+                      <button
+                        onClick={() => startGame('level')}
+                        className="w-full bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg active:scale-95 transition-all"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          🎯 关卡模式
+                        </div>
+                        <p className="text-xs text-emerald-200 mt-1">完成任务，逐关挑战</p>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 教程弹窗 */}
+              {showTutorial && (
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center rounded-lg z-20">
+                  <div className="bg-white rounded-2xl p-6 max-w-xs text-center shadow-2xl mx-4">
+                    {showTutorial === 'cluster' ? (
+                      <>
+                        <div className="text-4xl mb-3">✨</div>
+                        <h3 className="text-xl font-black text-gray-800 mb-2">区域消除!</h3>
+                        <p className="text-gray-600 text-sm mb-4">
+                          5个以上<span className="font-bold text-indigo-600">相邻同色</span>方块会一起消除，并累积一次<span className="font-bold text-amber-500">能量</span>！
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-4xl mb-3">💥</div>
+                        <h3 className="text-xl font-black text-gray-800 mb-2">色魂炸弹!</h3>
+                        <p className="text-gray-600 text-sm mb-4">
+                          累积<span className="font-bold text-indigo-600">3次能量</span>后，最后一次消除的颜色会触发<span className="font-bold text-rose-500">全场同色消除</span>！
+                        </p>
+                      </>
+                    )}
+                    <button
+                      onClick={dismissTutorial}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-full font-bold shadow-lg active:scale-95 transition-all w-full"
+                    >
+                      知道了
+                    </button>
                   </div>
                 </div>
               )}

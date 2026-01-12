@@ -1,4 +1,4 @@
-import type { ColorId, TetrominoType, GameConfig, InputAction } from '../types';
+import type { ColorId, TetrominoType, GameConfig, InputAction, LevelTarget } from '../types';
 
 // ============ 游戏常量 ============
 
@@ -92,3 +92,17 @@ export const ANIMATION = {
   GRAVITY_FALL: 400,
   SOUL_BOMB_CHARGE: 800,
 } as const;
+
+// 关卡配置
+export const LEVELS: LevelTarget[] = [
+  { yellow: 12 },                          // 第1关: 消除12个黄色
+  { yellow: 12, red: 12 },                 // 第2关: 消除12黄+12红
+  { yellow: 15, red: 15, blue: 12 },       // 第3关: 15黄+15红+12蓝
+  { red: 18, blue: 18, yellow: 18 },       // 第4关: 各18个
+  { red: 22, blue: 22, yellow: 22 },       // 第5关: 各22个
+  { red: 25, blue: 25, yellow: 25 },       // 第6关: 各25个
+  { red: 30, blue: 30, yellow: 30 },       // 第7关: 各30个
+  { red: 35, blue: 35, yellow: 35 },       // 第8关: 各35个
+  { red: 40, blue: 40, yellow: 40 },       // 第9关: 各40个
+  { red: 50, blue: 50, yellow: 50 },       // 第10关: 各50个
+];
