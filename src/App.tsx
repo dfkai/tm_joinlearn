@@ -1126,8 +1126,7 @@ const GomokuTetris = () => {
           {/* 移动端底部按钮 */}
           <div className="lg:hidden flex gap-2 w-full max-w-sm mt-1">
             <button
-              onTouchStart={(e) => { e.preventDefault(); handleTouchAction('rotate'); }}
-              onMouseDown={() => handleTouchAction('rotate')}
+              onClick={() => handleTouchAction('rotate')}
               className="flex-1 py-2.5 bg-indigo-600 rounded-lg text-white font-bold text-sm shadow active:bg-indigo-700 active:scale-95 transition-transform select-none touch-manipulation"
             >
               旋转
