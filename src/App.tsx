@@ -115,14 +115,25 @@ const GomokuTetris = () => {
 
   // 进入下一关
   const nextLevel = useCallback(() => {
+    // 清空棋盘和所有动画状态
     const emptyBoard = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
     setBoard(emptyBoard);
+    setMatchingCells(new Set());
+    setFallingOffsets({});
+    setFallingStartTime(0);
+    setParticles([]);
+
+    // 重置关卡进度
     setLevelProgress({ red: 0, blue: 0, yellow: 0 });
     setShowLevelComplete(false);
     setCurrentLevel(prev => prev + 1);
+
+    // 重置色魂系统
     setSoulCounter(0);
     setLastGomokuColor(null);
+    setActiveSoulBomb(null);
 
+    // 生成新方块
     const first = spawnPiece(emptyBoard);
     const second = spawnPiece(emptyBoard);
     setCurrentPiece(first);
@@ -403,9 +414,17 @@ const GomokuTetris = () => {
         }
 
         // 处理色魂累积（五子连珠或区域消除都触发）
+        // 规则：必须连续同色才能累积，换色则重置为1
         if (allMatchedColors.length > 0) {
-          currentLastColor = allMatchedColors[allMatchedColors.length - 1];
-          currentSoulCount = Math.min(3, currentSoulCount + 1);
+          const newColor = allMatchedColors[allMatchedColors.length - 1];
+          if (currentLastColor === newColor) {
+            // 同色：继续累积
+            currentSoulCount = Math.min(3, currentSoulCount + 1);
+          } else {
+            // 换色：重置为1（当前这次算第一次）
+            currentSoulCount = 1;
+          }
+          currentLastColor = newColor;
           setSoulCounter(currentSoulCount);
           setLastGomokuColor(currentLastColor);
         }
