@@ -786,9 +786,7 @@ const GomokuTetris = () => {
     }
   }, [combos]);
 
-  // ============ 移动端虚拟按钮处理 ============
-  const moveIntervalRef = useRef<number | null>(null);
-
+  // ============ 移动端触摸处理 ============
   const handleTouchAction = (action: string) => {
     if (gameState !== 'playing' || !currentPiece || isSettling || isExploding) return;
 
@@ -828,28 +826,106 @@ const GomokuTetris = () => {
     }
   };
 
-  // 连续移动（长按）
-  const startContinuousMove = (direction: 'left' | 'right') => {
-    if (moveIntervalRef.current) clearInterval(moveIntervalRef.current);
+  // ============ 移动端棋盘触摸控制 ============
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const acceleratingRef = useRef(false);
+  const accelIntervalRef = useRef<number | null>(null);
 
-    handleTouchAction(direction);
+  const handleCanvasTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (gameState !== 'playing' || !currentPiece || isSettling || isExploding) return;
+    e.preventDefault();
 
-    moveIntervalRef.current = window.setInterval(() => {
-      handleTouchAction(direction);
-    }, 100);
+    const touch = e.touches[0];
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const touchX = (touch.clientX - rect.left) * scaleX;
+    const touchY = (touch.clientY - rect.top) * scaleY;
+
+    touchStartRef.current = { x: touchX, y: touchY, time: Date.now() };
+
+    // 长按检测 - 开始加速下落
+    longPressTimerRef.current = window.setTimeout(() => {
+      acceleratingRef.current = true;
+      let speed = 150; // 初始速度
+
+      const accelerate = () => {
+        if (!acceleratingRef.current) return;
+        setIsSoftDropping(true);
+        // 逐渐加速
+        speed = Math.max(30, speed - 10);
+        accelIntervalRef.current = window.setTimeout(accelerate, speed);
+      };
+      accelerate();
+    }, 200);
   };
 
-  const stopContinuousMove = () => {
-    if (moveIntervalRef.current) {
-      clearInterval(moveIntervalRef.current);
-      moveIntervalRef.current = null;
+  const handleCanvasTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+
+    // 清除长按定时器
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
+
+    // 停止加速下落
+    if (acceleratingRef.current) {
+      acceleratingRef.current = false;
+      setIsSoftDropping(false);
+      if (accelIntervalRef.current) {
+        clearTimeout(accelIntervalRef.current);
+        accelIntervalRef.current = null;
+      }
+      touchStartRef.current = null;
+      return;
+    }
+
+    if (!touchStartRef.current || !currentPiece || gameState !== 'playing') return;
+
+    const touchDuration = Date.now() - touchStartRef.current.time;
+
+    // 只有短点击才处理移动/旋转
+    if (touchDuration < 200) {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const touchX = touchStartRef.current.x;
+      const touchY = touchStartRef.current.y;
+
+      // 计算当前方块的边界
+      const pieceLeft = currentPiece.x * CELL_SIZE;
+      const pieceRight = (currentPiece.x + currentPiece.shape[0].length) * CELL_SIZE;
+      const pieceTop = currentPiece.y * CELL_SIZE;
+      const pieceBottom = (currentPiece.y + currentPiece.shape.length) * CELL_SIZE;
+
+      // 判断是否点击在当前方块上 -> 旋转
+      if (touchX >= pieceLeft && touchX <= pieceRight &&
+          touchY >= pieceTop && touchY <= pieceBottom) {
+        handleTouchAction('rotate');
+      }
+      // 点击棋盘左半边 -> 左移
+      else if (touchX < canvas.width / 2) {
+        handleTouchAction('left');
+      }
+      // 点击棋盘右半边 -> 右移
+      else {
+        handleTouchAction('right');
+      }
+    }
+
+    touchStartRef.current = null;
   };
 
-  // 清理连续移动
+  // 清理触摸相关定时器
   useEffect(() => {
     return () => {
-      if (moveIntervalRef.current) clearInterval(moveIntervalRef.current);
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      if (accelIntervalRef.current) clearTimeout(accelIntervalRef.current);
     };
   }, []);
 
@@ -882,10 +958,10 @@ const GomokuTetris = () => {
 
   // ============ 渲染色魂能量条 ============
   const renderSoulBar = (compact: boolean = false) => (
-    <div className={`flex ${compact ? 'flex-row items-center gap-2' : 'flex-col gap-2'} p-2 bg-white rounded-xl shadow-sm border border-gray-100 transition-all duration-300 ${activeSoulBomb ? 'ring-2 ring-offset-2 ring-opacity-50' : ''}`}>
-      <div className={`text-[10px] font-bold text-gray-400 ${compact ? '' : 'mb-1'}`}>能量</div>
+    <div className={`flex ${compact ? 'flex-row items-center gap-1.5 p-1.5' : 'flex-col gap-2 p-2'} bg-white rounded-lg shadow-sm border border-gray-100 transition-all duration-300 ${activeSoulBomb ? 'ring-2 ring-offset-2 ring-opacity-50' : ''}`}>
+      <div className={`${compact ? 'text-[9px]' : 'text-[10px] mb-1'} font-bold text-gray-400`}>能量</div>
       <div className="flex items-center gap-1.5 flex-1">
-        <div className={`flex-1 ${compact ? 'h-2' : 'h-3'} bg-gray-100 rounded-full overflow-hidden flex gap-0.5`}>
+        <div className={`flex-1 ${compact ? 'h-1.5' : 'h-3'} bg-gray-100 rounded-full overflow-hidden flex gap-0.5`}>
           {[0, 1, 2].map(i => (
             <div
               key={i}
@@ -900,15 +976,15 @@ const GomokuTetris = () => {
             />
           ))}
         </div>
-        <div className="text-[10px] font-bold text-gray-500">{soulCounter}/3</div>
+        <div className={`${compact ? 'text-[9px]' : 'text-[10px]'} font-bold text-gray-500`}>{soulCounter}/3</div>
       </div>
     </div>
   );
 
   // ============ 渲染 ============
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0F2F5] p-2 sm:p-4 font-sans text-[#1A1A1A]">
-      <div className={`flex flex-col lg:flex-row gap-4 lg:gap-8 items-stretch lg:items-start max-w-full transform transition-transform duration-100 ${isShaking ? 'animate-pulse' : ''}`}>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0F2F5] p-1 sm:p-4 font-sans text-[#1A1A1A]">
+      <div className={`flex flex-col lg:flex-row gap-2 lg:gap-8 items-stretch lg:items-start max-w-full transform transition-transform duration-100 ${isShaking ? 'animate-pulse' : ''}`}>
 
         {/* 左侧信息栏 (PC端) */}
         <div className="hidden lg:flex flex-col gap-3 w-48">
@@ -933,32 +1009,32 @@ const GomokuTetris = () => {
 
         {/* 核心棋盘区 */}
         <div className="flex flex-col items-center">
-          {/* 移动端顶部信息栏 */}
-          <div className="lg:hidden w-full max-w-sm mb-3">
-            <div className="flex items-center justify-between gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+          {/* 移动端顶部信息栏 - 紧凑版 */}
+          <div className="lg:hidden w-full max-w-sm mb-1.5">
+            <div className="flex items-center justify-between gap-1 bg-white p-1.5 rounded-lg shadow-sm border border-gray-100">
               {/* 得分 */}
               <div className="flex-1 text-center">
-                <div className="text-[10px] text-gray-400 font-semibold">得分</div>
-                <div className="text-lg font-black text-indigo-600">{score}</div>
+                <div className="text-[9px] text-gray-400 font-semibold">得分</div>
+                <div className="text-base font-black text-indigo-600">{score}</div>
               </div>
               {/* 下一个方块 */}
-              <div className="flex flex-col items-center px-3 border-l border-r border-gray-100">
-                <div className="text-[10px] text-gray-400 font-semibold mb-1">下一个</div>
+              <div className="flex flex-col items-center px-2 border-l border-r border-gray-100">
+                <div className="text-[9px] text-gray-400 font-semibold">下一个</div>
                 {renderNextPiecePreview('sm')}
               </div>
               {/* 等级 */}
               <div className="flex-1 text-center">
-                <div className="text-[10px] text-gray-400 font-semibold">等级</div>
-                <div className="text-lg font-black text-emerald-600">Lv.{level}</div>
+                <div className="text-[9px] text-gray-400 font-semibold">等级</div>
+                <div className="text-base font-black text-emerald-600">Lv.{level}</div>
               </div>
             </div>
             {/* 移动端色魂能量条 */}
-            <div className="mt-2">
+            <div className="mt-1">
               {renderSoulBar(true)}
             </div>
           </div>
-          <div className="bg-white p-2 lg:p-4 rounded-2xl shadow-xl border-4 border-white mb-4">
-            <h1 className="text-2xl lg:text-4xl font-black text-center mb-2 lg:mb-4 tracking-tighter text-gray-800 italic">
+          <div className="bg-white p-1.5 lg:p-4 rounded-2xl shadow-xl border-4 border-white mb-1 lg:mb-4">
+            <h1 className="text-xl lg:text-4xl font-black text-center mb-1 lg:mb-4 tracking-tighter text-gray-800 italic">
               俄罗斯消消乐
             </h1>
 
@@ -969,6 +1045,8 @@ const GomokuTetris = () => {
                 height={BOARD_SIZE * CELL_SIZE}
                 className="rounded-lg shadow-inner bg-gray-50 max-w-[90vw] h-auto"
                 style={{ touchAction: 'none' }}
+                onTouchStart={handleCanvasTouchStart}
+                onTouchEnd={handleCanvasTouchEnd}
               />
 
               {combos.map(combo => (
@@ -1037,52 +1115,9 @@ const GomokuTetris = () => {
             </div>
           </div>
 
-          {/* 移动端虚拟控制按钮 */}
-          <div className="lg:hidden grid grid-cols-5 gap-2 w-full max-w-sm px-2">
-            <button
-              onTouchStart={(e) => { e.preventDefault(); startContinuousMove('left'); }}
-              onTouchEnd={(e) => { e.preventDefault(); stopContinuousMove(); }}
-              onMouseDown={() => startContinuousMove('left')}
-              onMouseUp={stopContinuousMove}
-              onMouseLeave={stopContinuousMove}
-              className="col-span-1 p-5 bg-gray-700 rounded-xl text-white font-bold text-2xl shadow-lg active:bg-gray-600 active:scale-95 transition-transform select-none touch-manipulation"
-            >
-              ←
-            </button>
-            <button
-              onTouchStart={(e) => { e.preventDefault(); handleTouchAction('rotate'); }}
-              onMouseDown={() => handleTouchAction('rotate')}
-              className="col-span-1 p-5 bg-indigo-600 rounded-xl text-white font-bold text-2xl shadow-lg active:bg-indigo-700 active:scale-95 transition-transform select-none touch-manipulation"
-            >
-              ↻
-            </button>
-            <button
-              onTouchStart={(e) => { e.preventDefault(); setIsSoftDropping(true); }}
-              onTouchEnd={(e) => { e.preventDefault(); setIsSoftDropping(false); }}
-              onMouseDown={() => setIsSoftDropping(true)}
-              onMouseUp={() => setIsSoftDropping(false)}
-              onMouseLeave={() => setIsSoftDropping(false)}
-              className="col-span-1 p-5 bg-amber-500 rounded-xl text-white font-bold text-2xl shadow-lg active:bg-amber-600 active:scale-95 transition-transform select-none touch-manipulation"
-            >
-              ↓
-            </button>
-            <button
-              onTouchStart={(e) => { e.preventDefault(); startContinuousMove('right'); }}
-              onTouchEnd={(e) => { e.preventDefault(); stopContinuousMove(); }}
-              onMouseDown={() => startContinuousMove('right')}
-              onMouseUp={stopContinuousMove}
-              onMouseLeave={stopContinuousMove}
-              className="col-span-1 p-5 bg-gray-700 rounded-xl text-white font-bold text-2xl shadow-lg active:bg-gray-600 active:scale-95 transition-transform select-none touch-manipulation"
-            >
-              →
-            </button>
-            <button
-              onTouchStart={(e) => { e.preventDefault(); handleTouchAction('drop'); }}
-              onMouseDown={() => handleTouchAction('drop')}
-              className="col-span-1 p-5 bg-rose-600 rounded-xl text-white font-bold text-sm shadow-lg active:bg-rose-700 active:scale-95 transition-transform select-none touch-manipulation"
-            >
-              DROP
-            </button>
+          {/* 移动端提示 */}
+          <div className="lg:hidden text-center text-xs text-gray-400 mt-2 px-4">
+            点左/右移动 · 点方块旋转 · 长按加速
           </div>
         </div>
 
