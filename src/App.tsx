@@ -1118,10 +1118,11 @@ const GomokuTetris = () => {
           {/* 移动端底部按钮 */}
           <div className="lg:hidden flex gap-2 w-full max-w-sm mt-1">
             <button
-              onClick={resetGame}
-              className="flex-1 py-2.5 bg-gray-600 rounded-lg text-white font-bold text-sm shadow active:bg-gray-700 active:scale-95 transition-transform select-none touch-manipulation"
+              onTouchStart={(e) => { e.preventDefault(); handleTouchAction('rotate'); }}
+              onMouseDown={() => handleTouchAction('rotate')}
+              className="flex-1 py-2.5 bg-indigo-600 rounded-lg text-white font-bold text-sm shadow active:bg-indigo-700 active:scale-95 transition-transform select-none touch-manipulation"
             >
-              重开一局
+              旋转
             </button>
             <button
               onTouchStart={(e) => { e.preventDefault(); setIsSoftDropping(true); }}
@@ -1136,7 +1137,7 @@ const GomokuTetris = () => {
           </div>
           {/* 移动端操作提示 */}
           <div className="lg:hidden text-center text-[10px] text-gray-400 mt-1.5">
-            点左/右移动 · 点方块旋转
+            点棋盘左/右侧移动
           </div>
         </div>
 
