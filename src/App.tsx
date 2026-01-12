@@ -984,6 +984,26 @@ const GomokuTetris = () => {
   // ============ 渲染 ============
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0F2F5] p-1 sm:p-4 font-sans text-[#1A1A1A]">
+      {/* 移动端顶部标题 */}
+      <div className="lg:hidden text-center mb-2">
+        <h1 className="text-2xl font-black tracking-tight" style={{ textShadow: '2px 2px 0 rgba(0,0,0,0.1)' }}>
+          <span className="text-[#FF3B3F]">俄</span>
+          <span className="text-[#4A90E2]">罗</span>
+          <span className="text-[#FFD700]">斯</span>
+          <span className="text-[#FF3B3F]">消</span>
+          <span className="text-[#4A90E2]">消</span>
+          <span className="text-[#FFD700]">乐</span>
+        </h1>
+        <a
+          href="https://joinlearn.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10px] text-gray-400 hover:text-indigo-500 transition-colors"
+        >
+          就学｜joinlearn.com 出品
+        </a>
+      </div>
+
       <div className={`flex flex-col lg:flex-row gap-2 lg:gap-8 items-stretch lg:items-start max-w-full transform transition-transform duration-100 ${isShaking ? 'animate-pulse' : ''}`}>
 
         {/* 左侧信息栏 (PC端) */}
@@ -1034,17 +1054,10 @@ const GomokuTetris = () => {
             </div>
           </div>
           <div className="bg-white p-1.5 lg:p-4 rounded-2xl shadow-xl border-4 border-white mb-1 lg:mb-4">
-            <h1 className="text-xl lg:text-4xl font-black text-center mb-0.5 lg:mb-4 tracking-tighter text-gray-800 italic">
+            {/* PC端标题 */}
+            <h1 className="hidden lg:block text-4xl font-black text-center mb-4 tracking-tighter text-gray-800 italic">
               俄罗斯消消乐
             </h1>
-            <a
-              href="https://joinlearn.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="lg:hidden block text-center text-[10px] text-gray-400 mb-1 hover:text-indigo-500 transition-colors"
-            >
-              就学｜joinlearn.com 出品
-            </a>
 
             <div className="relative">
               <canvas
