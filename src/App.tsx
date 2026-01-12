@@ -1034,9 +1034,17 @@ const GomokuTetris = () => {
             </div>
           </div>
           <div className="bg-white p-1.5 lg:p-4 rounded-2xl shadow-xl border-4 border-white mb-1 lg:mb-4">
-            <h1 className="text-xl lg:text-4xl font-black text-center mb-1 lg:mb-4 tracking-tighter text-gray-800 italic">
+            <h1 className="text-xl lg:text-4xl font-black text-center mb-0.5 lg:mb-4 tracking-tighter text-gray-800 italic">
               俄罗斯消消乐
             </h1>
+            <a
+              href="https://joinlearn.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="lg:hidden block text-center text-[10px] text-gray-400 mb-1 hover:text-indigo-500 transition-colors"
+            >
+              就学｜joinlearn.com 出品
+            </a>
 
             <div className="relative">
               <canvas
