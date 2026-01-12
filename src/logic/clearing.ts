@@ -1,5 +1,64 @@
-import type { Cell, ColorId, LineCheckResult, GomokuCheckResult } from '../types';
+import type { Cell, ColorId, LineCheckResult, GomokuCheckResult, ClusterCheckResult } from '../types';
 import { BOARD_SIZE } from '../constants';
+
+/**
+ * 检查区域消除（消消乐风格）
+ * 5个或更多相邻同色方块触发消除
+ */
+export const checkCluster = (board: (Cell | null)[][]): ClusterCheckResult => {
+  let cleared = false;
+  let clearCount = 0;
+  const toRemove = new Set<string>();
+  const matchedColors = new Set<ColorId>();
+  const visited = new Set<string>();
+
+  // BFS 找连通区域
+  const findCluster = (startY: number, startX: number, color: ColorId): Set<string> => {
+    const cluster = new Set<string>();
+    const queue: [number, number][] = [[startY, startX]];
+
+    while (queue.length > 0) {
+      const [y, x] = queue.shift()!;
+      const key = `${y},${x}`;
+
+      if (visited.has(key)) continue;
+      if (y < 0 || y >= BOARD_SIZE || x < 0 || x >= BOARD_SIZE) continue;
+      if (!board[y][x] || board[y][x]!.color !== color) continue;
+
+      visited.add(key);
+      cluster.add(key);
+
+      // 四方向相邻
+      queue.push([y - 1, x], [y + 1, x], [y, x - 1], [y, x + 1]);
+    }
+
+    return cluster;
+  };
+
+  for (let y = 0; y < BOARD_SIZE; y++) {
+    for (let x = 0; x < BOARD_SIZE; x++) {
+      const cell = board[y][x];
+      if (!cell || visited.has(`${y},${x}`)) continue;
+
+      const cluster = findCluster(y, x, cell.color);
+
+      // 5个或更多相邻同色触发消除
+      if (cluster.size >= 5) {
+        cluster.forEach(key => toRemove.add(key));
+        cleared = true;
+        clearCount++;
+        matchedColors.add(cell.color);
+      }
+    }
+  }
+
+  return {
+    cleared,
+    count: clearCount,
+    eliminating: toRemove,
+    matchedColors: Array.from(matchedColors)
+  };
+};
 
 /**
  * 检查五子连珠 (Gomoku - 得分机制)
@@ -54,7 +113,8 @@ export const checkGomoku = (board: (Cell | null)[][]): GomokuCheckResult => {
 };
 
 /**
- * 检查行/列消除 (多级消除判定)
+ * 检查行消除 (经典俄罗斯方块规则)
+ * 只检查横行，纵列不消除（满列意味着快要游戏结束）
  */
 export const checkLines = (board: (Cell | null)[][]): LineCheckResult => {
   let cleared = false;
@@ -63,7 +123,7 @@ export const checkLines = (board: (Cell | null)[][]): LineCheckResult => {
   const perfectEliminating = new Set<string>();
   const perfectLines: { type: 'row' | 'col'; index: number }[] = [];
 
-  // 1. 标准行消除 (生存机制)：只要满10格，不论颜色
+  // 标准行消除：满10格即消，同色额外加分
   for (let y = 0; y < BOARD_SIZE; y++) {
     const row = board[y];
     if (row.every(cell => cell !== null)) {
@@ -80,24 +140,8 @@ export const checkLines = (board: (Cell | null)[][]): LineCheckResult => {
     }
   }
 
-  // 2. 完美列消除 (高阶奖励)：只有满 10 格且同色才消除
-  for (let x = 0; x < BOARD_SIZE; x++) {
-    const col = Array.from({ length: BOARD_SIZE }, (_, y) => board[y][x]);
-    if (col.every(cell => cell !== null)) {
-      const firstColor = col[0]?.color;
-      const isPerfect = col.every(cell => cell?.color === firstColor);
-
-      if (isPerfect) {
-        cleared = true;
-        clearCount += 3;
-        for (let y = 0; y < BOARD_SIZE; y++) {
-          allEliminating.add(`${y},${x}`);
-          perfectEliminating.add(`${y},${x}`);
-        }
-        perfectLines.push({ type: 'col', index: x });
-      }
-    }
-  }
+  // 注意：不检查列消除，这符合经典俄罗斯方块规则
+  // 纵向5连同色由 checkGomoku 处理
 
   return {
     cleared,
