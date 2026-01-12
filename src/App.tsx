@@ -72,6 +72,12 @@ const GomokuTetris = () => {
   const [currentLevel, setCurrentLevel] = useState(1);
   const [levelProgress, setLevelProgress] = useState<LevelProgress>({ red: 0, blue: 0, yellow: 0 });
   const [showLevelComplete, setShowLevelComplete] = useState(false);
+  const gameModeRef = useRef<GameMode>(gameMode);
+
+  // 保持 ref 同步
+  useEffect(() => {
+    gameModeRef.current = gameMode;
+  }, [gameMode]);
 
   // ============ Refs ============
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -408,7 +414,7 @@ const GomokuTetris = () => {
         totalLines += lineResult.count;
 
         // 关卡模式：统计消除的各颜色数量
-        if (gameMode === 'level') {
+        if (gameModeRef.current === 'level') {
           const colorCounts: LevelProgress = { red: 0, blue: 0, yellow: 0 };
           allEliminating.forEach(key => {
             const [y, x] = key.split(',').map(Number);
@@ -1111,20 +1117,71 @@ const GomokuTetris = () => {
 
         {/* 左侧信息栏 (PC端) */}
         <div className="hidden lg:flex flex-col gap-3 w-48">
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-wider">得分</h3>
-            <p className="text-3xl font-black text-indigo-600">{score}</p>
-          </div>
+          {gameMode === 'level' ? (
+            <>
+              {/* 关卡模式显示 */}
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-wider">当前关卡</h3>
+                <p className="text-3xl font-black text-emerald-600">第{currentLevel}关</p>
+              </div>
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-wider">等级</h3>
-            <p className="text-3xl font-black text-emerald-600">Lv.{level}</p>
-          </div>
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">任务目标</h3>
+                <div className="space-y-2">
+                  {LEVELS[currentLevel - 1]?.yellow !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded bg-[#FFD700]" />
+                      <span className={`text-sm font-bold ${levelProgress.yellow >= (LEVELS[currentLevel - 1].yellow || 0) ? 'text-emerald-500' : 'text-gray-600'}`}>
+                        {levelProgress.yellow} / {LEVELS[currentLevel - 1].yellow}
+                      </span>
+                      {levelProgress.yellow >= (LEVELS[currentLevel - 1].yellow || 0) && <span className="text-emerald-500">✓</span>}
+                    </div>
+                  )}
+                  {LEVELS[currentLevel - 1]?.red !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded bg-[#FF3B3F]" />
+                      <span className={`text-sm font-bold ${levelProgress.red >= (LEVELS[currentLevel - 1].red || 0) ? 'text-emerald-500' : 'text-gray-600'}`}>
+                        {levelProgress.red} / {LEVELS[currentLevel - 1].red}
+                      </span>
+                      {levelProgress.red >= (LEVELS[currentLevel - 1].red || 0) && <span className="text-emerald-500">✓</span>}
+                    </div>
+                  )}
+                  {LEVELS[currentLevel - 1]?.blue !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded bg-[#4A90E2]" />
+                      <span className={`text-sm font-bold ${levelProgress.blue >= (LEVELS[currentLevel - 1].blue || 0) ? 'text-emerald-500' : 'text-gray-600'}`}>
+                        {levelProgress.blue} / {LEVELS[currentLevel - 1].blue}
+                      </span>
+                      {levelProgress.blue >= (LEVELS[currentLevel - 1].blue || 0) && <span className="text-emerald-500">✓</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-wider">行数</h3>
-            <p className="text-3xl font-black text-purple-600">{linesCleared}</p>
-          </div>
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-wider">得分</h3>
+                <p className="text-2xl font-black text-indigo-600">{score}</p>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* 计分模式显示 */}
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-wider">得分</h3>
+                <p className="text-3xl font-black text-indigo-600">{score}</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-wider">等级</h3>
+                <p className="text-3xl font-black text-emerald-600">Lv.{level}</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-wider">行数</h3>
+                <p className="text-3xl font-black text-purple-600">{linesCleared}</p>
+              </div>
+            </>
+          )}
 
           {/* 色魂能量条 */}
           {renderSoulBar()}
@@ -1134,58 +1191,69 @@ const GomokuTetris = () => {
         <div className="flex flex-col items-center">
           {/* 移动端顶部信息栏 - 紧凑版 */}
           <div className="lg:hidden w-full max-w-sm mb-1.5">
-            <div className="flex items-center justify-between gap-1 bg-white p-1.5 rounded-lg shadow-sm border border-gray-100">
-              {/* 得分/关卡 */}
-              <div className="flex-1 text-center">
-                <div className="text-[9px] text-gray-400 font-semibold">
-                  {gameMode === 'level' ? `第${currentLevel}关` : '得分'}
-                </div>
-                <div className="text-base font-black text-indigo-600">{score}</div>
-              </div>
-              {/* 下一个方块 */}
-              <div className="flex flex-col items-center px-2 border-l border-r border-gray-100">
-                <div className="text-[9px] text-gray-400 font-semibold">下一个</div>
-                {renderNextPiecePreview('sm')}
-              </div>
-              {/* 最高分 */}
-              <div className="flex-1 text-center">
-                <div className="text-[9px] text-gray-400 font-semibold">最高</div>
-                <div className="text-base font-black text-amber-500">{highScore}</div>
-              </div>
-            </div>
-            {/* 关卡模式进度条 */}
-            {gameMode === 'level' && LEVELS[currentLevel - 1] && (
-              <div className="mt-1 bg-white p-1.5 rounded-lg shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2 text-[9px]">
-                  <span className="text-gray-400 font-semibold whitespace-nowrap">任务:</span>
-                  <div className="flex-1 flex gap-1.5">
-                    {LEVELS[currentLevel - 1].yellow !== undefined && (
-                      <div className="flex items-center gap-0.5">
-                        <div className="w-2.5 h-2.5 rounded-sm bg-[#FFD700]" />
-                        <span className={levelProgress.yellow >= (LEVELS[currentLevel - 1].yellow || 0) ? 'text-emerald-500 font-bold' : 'text-gray-500'}>
+            {gameMode === 'level' ? (
+              <>
+                {/* 关卡模式：显示关卡和任务进度 */}
+                <div className="bg-emerald-50 p-2 rounded-lg shadow-sm border border-emerald-200 mb-1">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-emerald-700 font-black text-sm">第{currentLevel}关</span>
+                    <span className="text-[10px] text-emerald-600">得分: {score}</span>
+                  </div>
+                  <div className="text-[10px] text-emerald-600 font-semibold mb-1">任务目标:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {LEVELS[currentLevel - 1]?.yellow !== undefined && (
+                      <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full shadow-sm">
+                        <div className="w-3 h-3 rounded-sm bg-[#FFD700]" />
+                        <span className={`text-xs font-bold ${levelProgress.yellow >= (LEVELS[currentLevel - 1].yellow || 0) ? 'text-emerald-500' : 'text-gray-600'}`}>
                           {levelProgress.yellow}/{LEVELS[currentLevel - 1].yellow}
                         </span>
+                        {levelProgress.yellow >= (LEVELS[currentLevel - 1].yellow || 0) && <span className="text-emerald-500 text-xs">✓</span>}
                       </div>
                     )}
-                    {LEVELS[currentLevel - 1].red !== undefined && (
-                      <div className="flex items-center gap-0.5">
-                        <div className="w-2.5 h-2.5 rounded-sm bg-[#FF3B3F]" />
-                        <span className={levelProgress.red >= (LEVELS[currentLevel - 1].red || 0) ? 'text-emerald-500 font-bold' : 'text-gray-500'}>
+                    {LEVELS[currentLevel - 1]?.red !== undefined && (
+                      <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full shadow-sm">
+                        <div className="w-3 h-3 rounded-sm bg-[#FF3B3F]" />
+                        <span className={`text-xs font-bold ${levelProgress.red >= (LEVELS[currentLevel - 1].red || 0) ? 'text-emerald-500' : 'text-gray-600'}`}>
                           {levelProgress.red}/{LEVELS[currentLevel - 1].red}
                         </span>
+                        {levelProgress.red >= (LEVELS[currentLevel - 1].red || 0) && <span className="text-emerald-500 text-xs">✓</span>}
                       </div>
                     )}
-                    {LEVELS[currentLevel - 1].blue !== undefined && (
-                      <div className="flex items-center gap-0.5">
-                        <div className="w-2.5 h-2.5 rounded-sm bg-[#4A90E2]" />
-                        <span className={levelProgress.blue >= (LEVELS[currentLevel - 1].blue || 0) ? 'text-emerald-500 font-bold' : 'text-gray-500'}>
+                    {LEVELS[currentLevel - 1]?.blue !== undefined && (
+                      <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-full shadow-sm">
+                        <div className="w-3 h-3 rounded-sm bg-[#4A90E2]" />
+                        <span className={`text-xs font-bold ${levelProgress.blue >= (LEVELS[currentLevel - 1].blue || 0) ? 'text-emerald-500' : 'text-gray-600'}`}>
                           {levelProgress.blue}/{LEVELS[currentLevel - 1].blue}
                         </span>
+                        {levelProgress.blue >= (LEVELS[currentLevel - 1].blue || 0) && <span className="text-emerald-500 text-xs">✓</span>}
                       </div>
                     )}
                   </div>
                 </div>
-              </div>
+                {/* 下一个方块预览 */}
+                <div className="flex items-center justify-center gap-2 bg-white p-1.5 rounded-lg shadow-sm border border-gray-100">
+                  <span className="text-[9px] text-gray-400 font-semibold">下一个:</span>
+                  {renderNextPiecePreview('sm')}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* 计分模式：原有布局 */}
+                <div className="flex items-center justify-between gap-1 bg-white p-1.5 rounded-lg shadow-sm border border-gray-100">
+                  <div className="flex-1 text-center">
+                    <div className="text-[9px] text-gray-400 font-semibold">得分</div>
+                    <div className="text-base font-black text-indigo-600">{score}</div>
+                  </div>
+                  <div className="flex flex-col items-center px-2 border-l border-r border-gray-100">
+                    <div className="text-[9px] text-gray-400 font-semibold">下一个</div>
+                    {renderNextPiecePreview('sm')}
+                  </div>
+                  <div className="flex-1 text-center">
+                    <div className="text-[9px] text-gray-400 font-semibold">最高</div>
+                    <div className="text-base font-black text-amber-500">{highScore}</div>
+                  </div>
+                </div>
+              </>
             )}
             {/* 移动端色魂能量条 */}
             <div className="mt-1">
