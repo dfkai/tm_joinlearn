@@ -985,22 +985,23 @@ const GomokuTetris = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-[#F0F2F5] p-1 sm:p-4 font-sans text-[#1A1A1A]">
       {/* 移动端顶部标题 */}
-      <div className="lg:hidden text-center mb-2">
-        <h1 className="text-2xl font-black tracking-tight" style={{ textShadow: '2px 2px 0 rgba(0,0,0,0.1)' }}>
-          <span className="text-[#FF3B3F]">俄</span>
-          <span className="text-[#4A90E2]">罗</span>
-          <span className="text-[#FFD700]">斯</span>
-          <span className="text-[#FF3B3F]">消</span>
-          <span className="text-[#4A90E2]">消</span>
-          <span className="text-[#FFD700]">乐</span>
+      <div className="lg:hidden text-center mb-1.5">
+        <h1 className="text-3xl font-black tracking-wide leading-tight">
+          <span className="inline-block text-[#FF3B3F] drop-shadow-sm" style={{ WebkitTextStroke: '1px rgba(0,0,0,0.1)' }}>俄</span>
+          <span className="inline-block text-[#4A90E2] drop-shadow-sm" style={{ WebkitTextStroke: '1px rgba(0,0,0,0.1)' }}>罗</span>
+          <span className="inline-block text-[#FFD700] drop-shadow-sm" style={{ WebkitTextStroke: '1px rgba(0,0,0,0.1)' }}>斯</span>
+          <span className="inline-block text-[#FF3B3F] drop-shadow-sm" style={{ WebkitTextStroke: '1px rgba(0,0,0,0.1)' }}>消</span>
+          <span className="inline-block text-[#4A90E2] drop-shadow-sm" style={{ WebkitTextStroke: '1px rgba(0,0,0,0.1)' }}>消</span>
+          <span className="inline-block text-[#FFD700] drop-shadow-sm" style={{ WebkitTextStroke: '1px rgba(0,0,0,0.1)' }}>乐</span>
         </h1>
         <a
           href="https://joinlearn.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[10px] text-gray-400 hover:text-indigo-500 transition-colors"
+          className="inline-flex items-center gap-1 text-xs text-indigo-500 font-medium mt-0.5 px-2 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 active:scale-95 transition-all"
         >
           就学｜joinlearn.com 出品
+          <span className="text-[10px]">→</span>
         </a>
       </div>
 
