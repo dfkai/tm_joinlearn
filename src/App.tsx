@@ -27,37 +27,53 @@ const COLOR_IDS: ColorId[] = ['red', 'blue', 'yellow'];
 
 /**
  * 生成带有初始色块的棋盘
- * 色块分布在底部几行，随机位置和颜色
+ * 色块从底部堆叠上来，每列连续不悬空
  */
 const generateInitialBoard = (blockCount: number): (Cell | null)[][] => {
   const board: (Cell | null)[][] = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
 
   if (blockCount <= 0) return board;
 
-  // 色块分布在底部3-5行
-  const maxRows = Math.min(5, Math.ceil(blockCount / BOARD_SIZE) + 2);
-  const startRow = BOARD_SIZE - maxRows;
+  // 计算每列大概需要多少个色块
+  const avgPerCol = blockCount / BOARD_SIZE;
+  const columnHeights: number[] = [];
 
-  // 收集所有可用位置
-  const availablePositions: { row: number; col: number }[] = [];
-  for (let row = startRow; row < BOARD_SIZE; row++) {
-    for (let col = 0; col < BOARD_SIZE; col++) {
-      availablePositions.push({ row, col });
+  // 为每列分配随机高度，总和接近 blockCount
+  let totalAssigned = 0;
+  for (let col = 0; col < BOARD_SIZE; col++) {
+    // 随机高度在平均值附近波动
+    const variance = Math.floor(avgPerCol * 0.8);
+    const minHeight = Math.max(0, Math.floor(avgPerCol) - variance);
+    const maxHeight = Math.min(BOARD_SIZE - 2, Math.ceil(avgPerCol) + variance); // 留出顶部空间
+    const height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+    columnHeights.push(height);
+    totalAssigned += height;
+  }
+
+  // 调整以接近目标数量
+  while (totalAssigned < blockCount) {
+    const col = Math.floor(Math.random() * BOARD_SIZE);
+    if (columnHeights[col] < BOARD_SIZE - 2) {
+      columnHeights[col]++;
+      totalAssigned++;
+    }
+  }
+  while (totalAssigned > blockCount) {
+    const col = Math.floor(Math.random() * BOARD_SIZE);
+    if (columnHeights[col] > 0) {
+      columnHeights[col]--;
+      totalAssigned--;
     }
   }
 
-  // 随机打乱位置
-  for (let i = availablePositions.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [availablePositions[i], availablePositions[j]] = [availablePositions[j], availablePositions[i]];
-  }
-
-  // 放置色块
-  const placedCount = Math.min(blockCount, availablePositions.length);
-  for (let i = 0; i < placedCount; i++) {
-    const { row, col } = availablePositions[i];
-    const color = COLOR_IDS[Math.floor(Math.random() * COLOR_IDS.length)];
-    board[row][col] = { color, pieceId: -1 };
+  // 从底部往上填充每列
+  for (let col = 0; col < BOARD_SIZE; col++) {
+    const height = columnHeights[col];
+    for (let i = 0; i < height; i++) {
+      const row = BOARD_SIZE - 1 - i; // 从底部开始
+      const color = COLOR_IDS[Math.floor(Math.random() * COLOR_IDS.length)];
+      board[row][col] = { color, pieceId: -1 };
+    }
   }
 
   return board;
