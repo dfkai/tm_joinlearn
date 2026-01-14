@@ -94,15 +94,17 @@ export const ANIMATION = {
 } as const;
 
 // 关卡配置
+// initialBlocks: 初始色块数量（底部随机分布）
+// dropSpeed: 下落间隔（毫秒），越小越快
 export const LEVELS: LevelTarget[] = [
-  { yellow: 12 },                          // 第1关: 消除12个黄色
-  { yellow: 12, red: 12 },                 // 第2关: 消除12黄+12红
-  { yellow: 15, red: 15, blue: 12 },       // 第3关: 15黄+15红+12蓝
-  { red: 18, blue: 18, yellow: 18 },       // 第4关: 各18个
-  { red: 22, blue: 22, yellow: 22 },       // 第5关: 各22个
-  { red: 25, blue: 25, yellow: 25 },       // 第6关: 各25个
-  { red: 30, blue: 30, yellow: 30 },       // 第7关: 各30个
-  { red: 35, blue: 35, yellow: 35 },       // 第8关: 各35个
-  { red: 40, blue: 40, yellow: 40 },       // 第9关: 各40个
-  { red: 50, blue: 50, yellow: 50 },       // 第10关: 各50个
+  { yellow: 12, initialBlocks: 0, dropSpeed: 1000 },                          // 第1关: 空棋盘起步
+  { yellow: 12, red: 12, initialBlocks: 5, dropSpeed: 950 },                  // 第2关: 5个初始色块
+  { yellow: 15, red: 15, blue: 12, initialBlocks: 8, dropSpeed: 900 },        // 第3关: 8个初始色块
+  { red: 18, blue: 18, yellow: 18, initialBlocks: 12, dropSpeed: 850 },       // 第4关: 12个初始色块
+  { red: 22, blue: 22, yellow: 22, initialBlocks: 15, dropSpeed: 800 },       // 第5关: 15个初始色块
+  { red: 25, blue: 25, yellow: 25, initialBlocks: 18, dropSpeed: 750 },       // 第6关: 18个初始色块
+  { red: 30, blue: 30, yellow: 30, initialBlocks: 22, dropSpeed: 700 },       // 第7关: 22个初始色块
+  { red: 35, blue: 35, yellow: 35, initialBlocks: 25, dropSpeed: 650 },       // 第8关: 25个初始色块
+  { red: 40, blue: 40, yellow: 40, initialBlocks: 28, dropSpeed: 600 },       // 第9关: 28个初始色块
+  { red: 50, blue: 50, yellow: 50, initialBlocks: 32, dropSpeed: 500 },       // 第10关: 32个初始色块
 ];

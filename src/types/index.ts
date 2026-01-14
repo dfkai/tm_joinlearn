@@ -97,6 +97,8 @@ export interface LevelTarget {
   red?: number;
   blue?: number;
   yellow?: number;
+  initialBlocks?: number;  // 初始色块数量（底部随机分布）
+  dropSpeed?: number;       // 下落速度（毫秒），越小越快
 }
 
 export interface LevelProgress {

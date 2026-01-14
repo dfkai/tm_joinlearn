@@ -22,6 +22,47 @@ const COLOR_MAP: Record<ColorId, string> = {
   yellow: '#FFD700'
 };
 
+// 颜色数组用于随机选择
+const COLOR_IDS: ColorId[] = ['red', 'blue', 'yellow'];
+
+/**
+ * 生成带有初始色块的棋盘
+ * 色块分布在底部几行，随机位置和颜色
+ */
+const generateInitialBoard = (blockCount: number): (Cell | null)[][] => {
+  const board: (Cell | null)[][] = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+
+  if (blockCount <= 0) return board;
+
+  // 色块分布在底部3-5行
+  const maxRows = Math.min(5, Math.ceil(blockCount / BOARD_SIZE) + 2);
+  const startRow = BOARD_SIZE - maxRows;
+
+  // 收集所有可用位置
+  const availablePositions: { row: number; col: number }[] = [];
+  for (let row = startRow; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      availablePositions.push({ row, col });
+    }
+  }
+
+  // 随机打乱位置
+  for (let i = availablePositions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [availablePositions[i], availablePositions[j]] = [availablePositions[j], availablePositions[i]];
+  }
+
+  // 放置色块
+  const placedCount = Math.min(blockCount, availablePositions.length);
+  for (let i = 0; i < placedCount; i++) {
+    const { row, col } = availablePositions[i];
+    const color = COLOR_IDS[Math.floor(Math.random() * COLOR_IDS.length)];
+    board[row][col] = { color, pieceId: -1 };
+  }
+
+  return board;
+};
+
 const GomokuTetris = () => {
   // ============ 核心游戏状态 ============
   const [board, setBoard] = useState<(Cell | null)[][]>(
@@ -84,15 +125,29 @@ const GomokuTetris = () => {
   const animationFrame = useRef(0);
   const dropTimerRef = useRef<number | null>(null);
   const lockTimerRef = useRef<number | null>(null);
+  const boardRef = useRef<(Cell | null)[][]>(board);
+
+  // 保持 boardRef 同步
+  useEffect(() => {
+    boardRef.current = board;
+  }, [board]);
 
   // ============ 游戏初始化 ============
   const startGame = useCallback((mode: GameMode = gameMode) => {
-    const emptyBoard = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
-    setBoard(emptyBoard);
+    // 关卡模式下获取第一关配置
+    const levelConfig = mode === 'level' ? LEVELS[0] : null;
+    const initialBlocks = levelConfig?.initialBlocks || 0;
+    const initialBoard = generateInitialBoard(initialBlocks);
+
+    setBoard(initialBoard);
     setScore(0);
     setLevel(1);
     setLinesCleared(0);
-    setDropInterval(GAME_CONFIG.initialDropInterval);
+
+    // 根据模式设置下落速度
+    const initialDropSpeed = levelConfig?.dropSpeed || GAME_CONFIG.initialDropInterval;
+    setDropInterval(initialDropSpeed);
+
     setSoulCounter(0);
     setLastGomokuColor(null);
     setGameMode(mode);
@@ -100,8 +155,8 @@ const GomokuTetris = () => {
     setLevelProgress({ red: 0, blue: 0, yellow: 0 });
     setShowLevelComplete(false);
 
-    const first = spawnPiece(emptyBoard);
-    const second = spawnPiece(emptyBoard);
+    const first = spawnPiece(initialBoard);
+    const second = spawnPiece(initialBoard);
     setCurrentPiece(first);
     setNextPiece(second);
     setGameState('playing');
@@ -115,9 +170,16 @@ const GomokuTetris = () => {
 
   // 进入下一关
   const nextLevel = useCallback(() => {
-    // 清空棋盘和所有动画状态
-    const emptyBoard = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
-    setBoard(emptyBoard);
+    // 获取下一关的配置
+    const nextLevelIndex = currentLevel; // currentLevel 是当前关卡号（从1开始），下一关就是 currentLevel
+    const levelConfig = LEVELS[nextLevelIndex]; // 数组索引从0开始
+
+    // 生成带有初始色块的棋盘
+    const initialBlocks = levelConfig?.initialBlocks || 0;
+    const initialBoard = generateInitialBoard(initialBlocks);
+    setBoard(initialBoard);
+
+    // 清除所有动画状态
     setMatchingCells(new Set());
     setFallingOffsets({});
     setFallingStartTime(0);
@@ -128,18 +190,22 @@ const GomokuTetris = () => {
     setShowLevelComplete(false);
     setCurrentLevel(prev => prev + 1);
 
+    // 设置关卡的下落速度
+    const levelDropSpeed = levelConfig?.dropSpeed || GAME_CONFIG.initialDropInterval;
+    setDropInterval(levelDropSpeed);
+
     // 重置色魂系统
     setSoulCounter(0);
     setLastGomokuColor(null);
     setActiveSoulBomb(null);
 
     // 生成新方块
-    const first = spawnPiece(emptyBoard);
-    const second = spawnPiece(emptyBoard);
+    const first = spawnPiece(initialBoard);
+    const second = spawnPiece(initialBoard);
     setCurrentPiece(first);
     setNextPiece(second);
     setGameState('playing');
-  }, []);
+  }, [currentLevel]);
 
   // ============ 更新最高分 ============
   useEffect(() => {
@@ -636,35 +702,48 @@ const GomokuTetris = () => {
 
       switch (action) {
         case 'move_left':
-          if (canMoveHorizontal(currentPiece, -1, board)) {
-            setCurrentPiece(prev => prev ? { ...prev, x: prev.x - 1 } : null);
-            // 移动时重置锁定延迟
-            if (lockTimerRef.current) {
-              clearTimeout(lockTimerRef.current);
-              lockTimerRef.current = null;
+          setCurrentPiece(prev => {
+            if (!prev) return null;
+            // 使用 boardRef.current 确保检查最新的棋盘状态
+            if (canMoveHorizontal(prev, -1, boardRef.current)) {
+              // 移动时重置锁定延迟
+              if (lockTimerRef.current) {
+                clearTimeout(lockTimerRef.current);
+                lockTimerRef.current = null;
+              }
+              return { ...prev, x: prev.x - 1 };
             }
-          }
+            return prev;
+          });
           break;
 
         case 'move_right':
-          if (canMoveHorizontal(currentPiece, 1, board)) {
-            setCurrentPiece(prev => prev ? { ...prev, x: prev.x + 1 } : null);
-            if (lockTimerRef.current) {
-              clearTimeout(lockTimerRef.current);
-              lockTimerRef.current = null;
+          setCurrentPiece(prev => {
+            if (!prev) return null;
+            if (canMoveHorizontal(prev, 1, boardRef.current)) {
+              if (lockTimerRef.current) {
+                clearTimeout(lockTimerRef.current);
+                lockTimerRef.current = null;
+              }
+              return { ...prev, x: prev.x + 1 };
             }
-          }
+            return prev;
+          });
           break;
 
         case 'rotate':
-          const rotated = tryRotate(currentPiece, board);
-          if (rotated) {
-            setCurrentPiece(rotated);
-            if (lockTimerRef.current) {
-              clearTimeout(lockTimerRef.current);
-              lockTimerRef.current = null;
+          setCurrentPiece(prev => {
+            if (!prev) return null;
+            const rotated = tryRotate(prev, boardRef.current);
+            if (rotated) {
+              if (lockTimerRef.current) {
+                clearTimeout(lockTimerRef.current);
+                lockTimerRef.current = null;
+              }
+              return rotated;
             }
-          }
+            return prev;
+          });
           break;
 
         case 'soft_drop':
@@ -917,33 +996,46 @@ const GomokuTetris = () => {
 
     switch (action) {
       case 'left':
-        if (canMoveHorizontal(currentPiece, -1, board)) {
-          setCurrentPiece(prev => prev ? { ...prev, x: prev.x - 1 } : null);
-          // 重置锁定延迟
-          if (lockTimerRef.current) {
-            clearTimeout(lockTimerRef.current);
-            lockTimerRef.current = null;
+        setCurrentPiece(prev => {
+          if (!prev) return null;
+          // 使用 boardRef.current 确保检查最新的棋盘状态
+          if (canMoveHorizontal(prev, -1, boardRef.current)) {
+            // 重置锁定延迟
+            if (lockTimerRef.current) {
+              clearTimeout(lockTimerRef.current);
+              lockTimerRef.current = null;
+            }
+            return { ...prev, x: prev.x - 1 };
           }
-        }
+          return prev;
+        });
         break;
       case 'right':
-        if (canMoveHorizontal(currentPiece, 1, board)) {
-          setCurrentPiece(prev => prev ? { ...prev, x: prev.x + 1 } : null);
-          if (lockTimerRef.current) {
-            clearTimeout(lockTimerRef.current);
-            lockTimerRef.current = null;
+        setCurrentPiece(prev => {
+          if (!prev) return null;
+          if (canMoveHorizontal(prev, 1, boardRef.current)) {
+            if (lockTimerRef.current) {
+              clearTimeout(lockTimerRef.current);
+              lockTimerRef.current = null;
+            }
+            return { ...prev, x: prev.x + 1 };
           }
-        }
+          return prev;
+        });
         break;
       case 'rotate':
-        const rotated = tryRotate(currentPiece, board);
-        if (rotated) {
-          setCurrentPiece(rotated);
-          if (lockTimerRef.current) {
-            clearTimeout(lockTimerRef.current);
-            lockTimerRef.current = null;
+        setCurrentPiece(prev => {
+          if (!prev) return null;
+          const rotated = tryRotate(prev, boardRef.current);
+          if (rotated) {
+            if (lockTimerRef.current) {
+              clearTimeout(lockTimerRef.current);
+              lockTimerRef.current = null;
+            }
+            return rotated;
           }
-        }
+          return prev;
+        });
         break;
       case 'drop':
         hardDrop();
